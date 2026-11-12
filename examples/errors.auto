@@ -1,0 +1,20 @@
+dfa Broken over {0, 1}
+  start P
+  final Q
+  P -0-> Q
+  P -0-> P
+  P -> Q
+  P -2-> Q
+  R -1-> Q
+
+dfa NoStart
+  final X
+  X -a-> X
+
+regex Wrong over {a, b} = a(c|b)*
+
+Early = minimize(Later)
+Later = complement(Missing)
+TooMany = union(Broken)
+
+run Broken "012"

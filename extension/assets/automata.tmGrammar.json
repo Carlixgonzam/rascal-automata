@@ -1,0 +1,12 @@
+{
+    "scopeName": "source.automata",
+    "name": "Automata",
+    "patterns": [
+        { "name": "comment.line.double-slash.automata", "match": "//.*$" },
+        { "name": "string.quoted.double.automata", "match": "\"[A-Za-z0-9]*\"" },
+        { "name": "keyword.control.automata", "match": "\\b(dfa|nfa|regex|over|start|final|run|show|check)\\b" },
+        { "name": "support.function.automata", "match": "\\b(determinize|minimize|complement|union|intersection|difference|rename)\\b" },
+        { "name": "constant.language.automata", "match": "λ|ε|∅|\\blambda\\b" },
+        { "name": "keyword.operator.automata", "match": "->|-|\\||\\*|\\+|\\?" }
+    ]
+}

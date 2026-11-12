@@ -1,0 +1,36 @@
+dfa Has01
+  start a
+  final b
+  a -1-> a
+  a -0-> c
+  c -0-> c
+  c -1-> b
+  b -0,1-> b
+
+nfa End0Or1
+  start A
+  final D
+  A -> B, C
+  B -1-> D
+  C -0,1-> C
+  C -0-> D
+
+nfa Blocks
+  start E
+  final E
+  E -ab,aab,aba-> E
+
+regex NoAA = a(b|ba)* | (b|ba)*
+regex NoAA2 = (b|ab)*(a|λ)
+
+Dfa = rename(determinize(End0Or1))
+Min = minimize(Dfa)
+
+run Has01 λ, "01", "1101", "1110"
+run End0Or1 "1", "10", "11"
+run Blocks λ, "abaab", "b"
+
+show Min
+
+check NoAA = NoAA2
+check Has01 = End0Or1
