@@ -2,6 +2,7 @@ module lang::automata::Report
 
 import lang::automata::Build;
 import lang::automata::Core;
+import lang::automata::Grammar;
 import lang::automata::Stack;
 import lang::automata::Syntax;
 import lang::automata::Turing;
@@ -48,6 +49,10 @@ list[str] table(Tm m)
 
 str outcomeOf(start[Program] p, Expr e, str w) {
   str x = "<e>";
+  map[str, Grammar] gs = grammars(p);
+  if (x in gs) {
+    return derivation(gs[x], w);
+  }
   map[str, Pda] ps = pdas(p);
   if (x in ps) {
     return search(ps[x], w).accepted ? "accepted" : "rejected";
@@ -61,6 +66,9 @@ str outcomeOf(start[Program] p, Expr e, str w) {
 
 list[str] showOf(start[Program] p, Expr e) {
   str x = "<e>";
+  if (x in grammars(p)) {
+    return [describe(grammars(p)[x])] + table(grammars(p)[x]);
+  }
   if (x in pdas(p)) {
     return [describe(pdas(p)[x])] + table(pdas(p)[x]);
   }
@@ -70,3 +78,16 @@ list[str] showOf(start[Program] p, Expr e) {
   Automaton a = eval(e, env(p));
   return [describe(a)] + table(a);
 }
+
+str derivation(Grammar g, str w) {
+  <found, steps, cut> = derive(g, tokens(g, w));
+  if (found) {
+    return "derived in <size(steps)> <size(steps) == 1 ? "step" : "steps">";
+  }
+  return cut ? "gave up after <maxForms> sentential forms" : "not derived";
+}
+
+str describe(Grammar g) = "grammar, <size(g.rules)> rules";
+
+list[str] table(Grammar g)
+  = [ "<n> -\> <intercalate(" | ", [ sentence(rhs) | <m, rhs> <- g.rules, m == n ])>" | n <- dup(g.rules.lhs) ];

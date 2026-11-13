@@ -8,6 +8,8 @@ import lang::automata::Core;
 import lang::automata::Report;
 import lang::automata::Syntax;
 import lang::automata::View;
+import Location;
+import Message;
 import ParseTree;
 import util::IDEServices;
 import util::LanguageServer;
@@ -40,13 +42,23 @@ DocumentSymbolKind kind(Decl d) = d is regex ? \string() : (d is let ? \function
 list[DocumentSymbol] outline(start[Program] p)
   = [ symbol("<d.name>", kind(d), d.src, selection = d.name.src) | d <- p.top.decls, isDef(d) ];
 
-lrel[loc, Command] buttons(start[Program] p) {
-  if (hasErrors(check(p))) {
-    return [];
+bool hit(Decl d, set[Message] msgs) = any(m <- msgs, m is error, isContainedIn(m.at, d.src));
+
+bool uses(Decl d, set[str] names) = any(/(Expr) `<Name x>` := d, "<x>" in names);
+
+list[Decl] healthy(start[Program] p) {
+  set[Message] msgs = check(p);
+  set[str] broken = { "<d.name>" | d <- p.top.decls, isDef(d), hit(d, msgs) };
+  solve (broken) {
+    broken += { "<d.name>" | d <- p.top.decls, isDef(d), uses(d, broken) };
   }
+  return [ d | d <- p.top.decls, !hit(d, msgs), !uses(d, broken), !(isDef(d) && "<d.name>" in broken) ];
+}
+
+lrel[loc, Command] buttons(start[Program] p) {
   Env defs = env(p);
   lrel[loc, Command] out = [];
-  for (Decl d <- p.top.decls) {
+  for (Decl d <- healthy(p)) {
     if (isDef(d)) {
       out += [<d.src, showName(p, "<d.name>", "", title = "Show")>];
     } else if (d is run) {
@@ -61,12 +73,9 @@ lrel[loc, Command] buttons(start[Program] p) {
 }
 
 list[InlayHint] hints(start[Program] p) {
-  if (hasErrors(check(p))) {
-    return [];
-  }
   Env defs = env(p);
   list[InlayHint] out = [];
-  for (Decl d <- p.top.decls) {
+  for (Decl d <- healthy(p)) {
     if (d is let) {
       out += [hint(d.src, "  <describe(defs["<d.name>"])>", \type(), atEnd = true)];
     } else if (d is run) {
@@ -83,6 +92,9 @@ Command showIt(start[Program] p, e:(Expr) `<Name x>`, str word) = showName(p, "<
 default Command showIt(start[Program] p, Expr e, str word) = showExpr(p, e, word, title = "Show");
 
 Content viewOf(start[Program] p, str x, str w) {
+  if (x in grammars(p)) {
+    return view(x, grammars(p)[x], word = w);
+  }
   if (x in pdas(p)) {
     return view(x, pdas(p)[x], word = w);
   }

@@ -2,6 +2,7 @@ module lang::automata::Check
 
 import lang::automata::Build;
 import lang::automata::Core;
+import lang::automata::Grammar;
 import lang::automata::Stack;
 import lang::automata::Syntax;
 import lang::automata::Turing;
@@ -115,7 +116,7 @@ set[str] alphabetFor(Decl d, start[Program] p, Env defs) {
   if (x in ps) {
     return ps[x].alphabet;
   }
-  if (x in tms(p)) {
+  if (x in tms(p) || x in grammars(p)) {
     return {};
   }
   try {
@@ -125,9 +126,19 @@ set[str] alphabetFor(Decl d, start[Program] p, Env defs) {
   }
 }
 
-bool isDef(Decl d) = d is machine || d is regex || d is let || d is pda || d is tm;
+bool isDef(Decl d) = d is machine || d is regex || d is let || d is pda || d is tm || d is grammar;
 
-str kindOf(Decl d) = d is pda ? "a pushdown automaton" : "a Turing machine";
+str kindOf(Decl d) = d is pda ? "a pushdown automaton" : (d is grammar ? "a grammar" : "a Turing machine");
+
+set[Message] checkGrammar(Decl d) {
+  Grammar g = buildGrammar(d);
+  set[str] ns = nonterminals(g);
+  if (g.rules == []) {
+    return {error("<d.name> has no rules; add a line such as: S -\> a S b | λ", d.name.src)};
+  }
+  return { warning("<t> is read as one terminal; if you meant <intercalate(" ", chars("<t>"))>, separate the symbols with spaces", t.src)
+         | /Tok t := d.rules, "<t>" notin ns, size("<t>") > 1, any(n <- ns, contains("<t>", n)) };
+}
 
 list[str] firstNames(Tree t) = [ "<n>" | /Name n := t ];
 
@@ -197,7 +208,7 @@ set[Message] check(start[Program] p) {
   list[Decl] decls = [ d | d <- p.top.decls ];
   set[str] names = { "<d.name>" | d <- decls, isDef(d) };
   set[str] defined = {};
-  map[str, str] kinds = ( "<d.name>" : kindOf(d) | d <- decls, d is pda || d is tm );
+  map[str, str] kinds = ( "<d.name>" : kindOf(d) | d <- decls, d is pda || d is tm || d is grammar );
   set[str] machines = { "<d.name>" | d <- decls, d is tm };
   set[Message] msgs = misuse(p, kinds);
   Env defs = env(p);
@@ -216,6 +227,8 @@ set[Message] check(start[Program] p) {
         msgs += checkPda(d);
       } else if (d is tm) {
         msgs += checkTm(d, machines);
+      } else if (d is grammar) {
+        msgs += checkGrammar(d);
       } else {
         msgs += checkExpr(d.expr, defined, later - {x});
       }

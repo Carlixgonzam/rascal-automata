@@ -5,6 +5,7 @@
 <script src="/lib/cytoscape.js"></script>
 <script src="/lib/cytoscape-dagre.js"></script>
 <style>
+  [hidden] { display: none !important; }
   body { margin: 0; font: 14px sans-serif; color: #000; background: #fff; display: flex; flex-direction: column; height: 100vh; }
   header, .row, #say { padding: 8px 12px; }
   header { display: flex; gap: 6px; align-items: center; }
@@ -46,11 +47,12 @@ const style = [
       width: "label", height: "label", padding: "12px", "font-family": "monospace", "font-size": "13px" } },
   { selector: "node.final", style: { "border-style": "double", "border-width": 6 } },
   { selector: "node.entry", style: { width: 1, height: 1, padding: 0, "border-width": 0, "background-opacity": 0, label: "" } },
+  { selector: "node.term", style: { shape: "round-rectangle" } },
   { selector: "node.on", style: { "background-color": "#ffe9a8" } },
   { selector: "edge", style: {
       label: "data(label)", "text-wrap": "wrap", "curve-style": "bezier", "target-arrow-shape": "triangle", width: 1,
       "line-color": "#444", "target-arrow-color": "#444", "font-family": "monospace", "font-size": "12px",
-      "text-background-color": "#fff", "text-background-opacity": 1, "loop-direction": "-90deg", "loop-sweep": "-50deg" } },
+      "text-background-color": "#fff", "text-background-opacity": 1, "loop-direction": "0deg", "loop-sweep": "-60deg" } },
   { selector: "edge.took", style: { width: 3 } },
   { selector: "edge.jump", style: { width: 2, "line-style": "dashed" } }
 ];
@@ -58,14 +60,34 @@ const style = [
 function draw(a) {
   const elements = [];
   for (const n of a.nodes) {
-    elements.push({ data: { id: n.id, label: n.note ? n.id + "\n" + n.note : n.id }, classes: n.final ? "final" : "" });
+    const label = n.label || (n.note ? n.id + "\n" + n.note : n.id);
+    elements.push({ data: { id: n.id, label }, classes: (n.final ? "final " : "") + (n.terminal ? "term" : "") });
     if (n.initial) {
       elements.push({ data: { id: ">" + n.id }, classes: "entry" });
       elements.push({ data: { source: ">" + n.id, target: n.id, label: "" } });
     }
   }
   for (const e of a.edges) elements.push({ data: e });
-  cy = cytoscape({ container: $("graph"), elements, style, layout: { name: "dagre", rankDir: "LR", nodeSep: 50, rankSep: 80 } });
+  if (cy) cy.destroy();
+  const layout = a.direction == "TB"
+    ? { name: "preset", positions: tree(a), padding: 30 }
+    : { name: "dagre", rankDir: "LR", nodeSep: 60, rankSep: 120, padding: 30 };
+  cy = cytoscape({ container: $("graph"), elements, style, maxZoom: 1.5, layout });
+}
+
+function tree(a) {
+  const kids = {};
+  for (const e of a.edges) (kids[e.source] = kids[e.source] || []).push(e.target);
+  const at = {};
+  let leaves = 0;
+  const place = (id, depth) => {
+    const below = (kids[id] || []).map(k => place(k, depth + 1));
+    const x = below.length ? (below[0] + below[below.length - 1]) / 2 : 60 * leaves++;
+    at[id] = { x, y: 70 * depth };
+    return x;
+  };
+  if (a.nodes.length) place(a.nodes[0].id, 0);
+  return at;
 }
 
 function cell(text, cls) {
@@ -81,6 +103,10 @@ function show() {
   for (const q of s.states) cy.getElementById(q).addClass("on");
   for (const e of s.moves) cy.getElementById(e).addClass("took");
   for (const e of s.jumps) cy.getElementById(e).addClass("jump");
+  if (s.shown) {
+    const shown = new Set(s.shown);
+    cy.nodes().forEach(n => n.style("display", shown.has(n.id()) ? "element" : "none"));
+  }
   const tape = s.tape.length == 0 && s.read ? ["λ"] : s.tape;
   $("tape").replaceChildren(...tape.map((c, i) =>
     cell(c, "cell" + (s.read && i < s.head ? " read" : "") + (i == s.head || (s.read && s.tape.length == 0) ? " here" : ""))));
@@ -97,6 +123,7 @@ async function start(toEnd) {
     $("result").textContent = r.error;
     return;
   }
+  if (r.graph) draw(r.graph);
   run = { word, steps: r.steps, verdict: r.verdict, at: toEnd ? r.steps.length - 1 : 0 };
   show();
 }

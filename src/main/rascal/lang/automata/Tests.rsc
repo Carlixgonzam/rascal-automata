@@ -3,6 +3,7 @@ module lang::automata::Tests
 import lang::automata::Build;
 import lang::automata::Check;
 import lang::automata::Core;
+import lang::automata::Grammar;
 import lang::automata::Stack;
 import lang::automata::Syntax;
 import lang::automata::Turing;
@@ -351,3 +352,60 @@ test bool turingCall() {
   Run r = simulate(ms, "Caller", "ba");
   return tapeText(r) == "#bz" && r.head == 2;
 }
+
+Grammar grammarOf(str text, str name) = grammars(load(text, |memory:///g.auto|))[name];
+
+str sameAB = "grammar SameAB
+             '  S -\> a B | b A | λ
+             '  A -\> a S | b A A
+             '  B -\> b S | a B B
+             '";
+
+bool derives(Grammar g, str w) = derive(g, tokens(g, w)).found;
+
+test bool sameABIsEqualCounts() {
+  Grammar g = grammarOf(sameAB, "SameAB");
+  for (n <- [0..7], w <- wordsOfLength(n)) {
+    bool equal = size([ c | c <- chars(w), c == "a" ]) == size([ c | c <- chars(w), c == "b" ]);
+    if (derives(g, w) != equal) {
+      return false;
+    }
+  }
+  return true;
+}
+
+list[str] wordsOfLength(0) = [""];
+default list[str] wordsOfLength(int n) = [ w + c | w <- wordsOfLength(n - 1), c <- ["a", "b"] ];
+
+test bool leftRecursiveGrammar() {
+  Grammar g = grammarOf("grammar Expr
+                        '  E -\> E + T | T
+                        '  T -\> T * F | F
+                        '  F -\> ( E ) | n
+                        '", "Expr");
+  return derives(g, "n + n * n") && derives(g, "(n+n)*n") && !derives(g, "n +") && !derives(g, "()");
+}
+
+test bool multiCharacterTerminals() {
+  Grammar g = grammarOf("grammar If
+                        '  S -\> if c then S | x
+                        '", "If");
+  return tokens(g, "if c then x") == ["if", "c", "then", "x"] && derives(g, "if c then if c then x") && !derives(g, "if c then");
+}
+
+test bool derivationTreeGrows() {
+  Grammar g = grammarOf("grammar AnBn\n  S -\> a S b | a b\n", "AnBn");
+  map[str, value] r = runOf(g, "aabb");
+  if (list[map[str, value]] s := r["steps"], map[str, value] tree := r["graph"], list[value] nodes := tree["nodes"]) {
+    return size(s) == 3 && size(nodes) == 6 && s[0]["shown"] == ["n0"] && s[1]["tape"] == ["a", "S", "b"]
+        && s[2]["tape"] == ["a", "a", "b", "b"] && r["verdict"] == "derived in 2 steps";
+  }
+  return false;
+}
+
+test bool gluedSymbolsWarning() {
+  set[Message] msgs = check(load("grammar G\n  S -\> aSb | λ\n", |memory:///g.auto|));
+  return { m.msg | m <- msgs } == {"aSb is read as one terminal; if you meant a S b, separate the symbols with spaces"};
+}
+
+test bool grammarNotInOperations() = "minimize works on finite automata, and G is a grammar" in errors("grammar G\n  S -\> a\nM = minimize(G)\n");

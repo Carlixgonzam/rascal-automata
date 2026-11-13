@@ -3,6 +3,7 @@ module lang::automata::View
 import Content;
 import IO;
 import lang::automata::Core;
+import lang::automata::Grammar;
 import lang::automata::Stack;
 import lang::automata::Turing;
 import List;
@@ -142,6 +143,44 @@ map[str, value] runOf(map[str, Tm] machines, str name, str word) {
   return ("verdict": v, "accepted": v == "accepted", "steps": steps);
 }
 
+map[str, value] graph(str name, Grammar _, str word) = ("name": name, "word": word, "nodes": [], "edges": [], "direction": "TB");
+
+map[str, value] leaf(str id, str label, bool terminal) = ("id": id, "label": label, "terminal": terminal, "initial": false, "final": false, "note": "");
+
+map[str, value] runOf(Grammar g, str word) {
+  list[str] w = tokens(g, word);
+  <found, expansions, cut> = derive(g, w);
+  set[str] ns = nonterminals(g);
+  list[map[str, value]] nodes = [leaf("n0", g.axiom, false)];
+  list[map[str, value]] edges = [];
+  list[str] ids = ["n0"];
+  list[str] shown = ["n0"];
+  Form form = [g.axiom];
+  list[map[str, value]] steps = [("states": ["n0"], "moves": [], "jumps": [], "shown": shown, "tape": form, "head": 0, "read": false,
+                                  "notes": ["start from <g.axiom>"])];
+  for (<before, at, rhs> <- expansions) {
+    list[str] born = [ "n<size(nodes) + j>" | j <- index(rhs == [] ? ["λ"] : rhs) ];
+    nodes += [ leaf(born[j], rhs == [] ? "λ" : rhs[j], rhs == [] || rhs[j] notin ns) | j <- index(born) ];
+    edges += [ edge(ids[at], b, []) | b <- born ];
+    list[str] moves = [ edgeId(ids[at], b) | b <- born ];
+    ids = ids[..at] + (rhs == [] ? [] : born) + ids[at + 1..];
+    form = before[..at] + rhs + before[at + 1..];
+    shown += born;
+    int next = leftmost(g, form);
+    steps += [("states": next == -1 ? [] : [ids[next]], "moves": moves, "jumps": [], "shown": shown, "tape": form == [] ? ["λ"] : form,
+               "head": next, "read": false, "notes": ["<before[at]> -\> <sentence(rhs)>", "<sentence(form)>"])];
+  }
+  str verdict = found ? "derived in <size(expansions)> steps" : (cut ? "gave up" : "not derived");
+  str last = found
+    ? "this is a leftmost derivation of the word in <size(expansions)> steps"
+    : (cut ? "no derivation found after <maxForms> sentential forms" : "the grammar cannot derive this word");
+  if (list[str] ns2 := steps[size(steps) - 1]["notes"]) {
+    steps[size(steps) - 1]["notes"] = ns2 + [last];
+  }
+  return ("verdict": verdict, "accepted": found, "steps": steps,
+          "graph": ("name": "", "word": word, "nodes": nodes, "edges": edges, "direction": "TB"));
+}
+
 Response (Request) server(map[str, value] shape, map[str, value] (str) runner) {
   Response reply(get(/^\/automaton/)) = jsonResponse(ok(), (), shape);
   Response reply(get(/^\/run/, parameters = ps)) = jsonResponse(ok(), (), runner(ps["word"] ? ""));
@@ -158,6 +197,9 @@ Content view(str name, Automaton a, str word = "")
 
 Content view(str name, Pda m, str word = "")
   = window(name, graph(name, m, word), map[str, value] (str w) { return runOf(m, w); });
+
+Content view(str name, Grammar g, str word = "")
+  = window(name, graph(name, g, word), map[str, value] (str w) { return runOf(g, w); });
 
 Content view(map[str, Tm] machines, str name, str word = "")
   = window(name, graph(name, machines[name], word), map[str, value] (str w) { return runOf(machines, name, w); });

@@ -29,6 +29,7 @@ check End0Or1 = Ends0
   which `A` and `B` differ.
 - Pushdown automata with push, pop, ignore, skip, changeTop and pushOn.
 - Turing machines in the composed-machine notation of GOLD.
+- Grammars, with the leftmost derivation and its tree shown step by step.
 - A step-by-step viewer with the tape, the stack and the active states, which
   works offline.
 

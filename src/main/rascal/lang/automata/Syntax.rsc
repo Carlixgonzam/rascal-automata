@@ -11,6 +11,21 @@ syntax Decl
   | check: "check" Expr subject "=" Expr expected
   | pda: "pda" Name name PItem* moves
   | tm: "tm" Name name TItem* parts
+  | grammar: "grammar" Name name Rule* rules
+  ;
+
+syntax Rule = Name lhs "-\>" {Alt "|"}+ alts;
+
+syntax Alt
+  = none: Eps
+  | some: Tok+ toks
+  ;
+
+lexical Tok
+  = ([A-Za-z0-9_] !<< [A-Za-z0-9_] [A-Za-z0-9_]* !>> [A-Za-z0-9_]) \ Keywords
+  | [()+*/=\[\]{}.,;:\<!?&%$#@~^]
+  | [\>] !<< [\-] !>> [\>]
+  | "\'" ![\'\n]+ "\'"
   ;
 
 syntax Kind
@@ -130,7 +145,7 @@ lexical Word
 keyword Keywords
   = "dfa" | "nfa" | "regex" | "over" | "start" | "final" | "run" | "show" | "check"
   | "determinize" | "minimize" | "complement" | "union" | "intersection" | "difference"
-  | "rename" | "lambda" | "pda" | "tm" | "in" | "push" | "pop" | "ignore" | "skip" | "changeTop" | "pushOn"
+  | "rename" | "lambda" | "pda" | "tm" | "in" | "push" | "pop" | "ignore" | "skip" | "changeTop" | "pushOn" | "grammar"
   ;
 
 layout Layout = Space* !>> [\ \t\n\r] !>> "//";

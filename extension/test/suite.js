@@ -40,7 +40,7 @@ exports.run = async function () {
     throw new Error('missing the DFA error, got: ' + found.map(d => d.message).join(' | '));
   }
 
-  for (const [name, count] of [['course.auto', 12], ['pda.auto', 4], ['turing.auto', 4]]) {
+  for (const [name, count] of [['course.auto', 12], ['pda.auto', 4], ['turing.auto', 4], ['grammar.auto', 3]]) {
     const document = await open(name);
     const list = await until('the code lenses of ' + name, async () => {
       const got = await lenses(document);

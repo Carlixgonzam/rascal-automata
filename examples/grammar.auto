@@ -1,0 +1,12 @@
+grammar SameAB
+  S -> a B | b A | λ
+  A -> a S | b A A
+  B -> b S | a B B
+
+grammar Expr
+  E -> E + T | T
+  T -> T * F | F
+  F -> ( E ) | n
+
+run SameAB "abba", "aab"
+run Expr "n + n * n", "( n + n ) * n", "n +"

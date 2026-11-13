@@ -1,6 +1,7 @@
 module lang::automata::Build
 
 import lang::automata::Core;
+import lang::automata::Grammar;
 import lang::automata::Stack;
 import lang::automata::Syntax;
 import lang::automata::Turing;
@@ -73,7 +74,7 @@ start[Program] load(loc file) = parse(#start[Program], file);
 
 start[Program] load(str text, loc origin) = parse(#start[Program], text, origin);
 
-str unquote(/^\'<c:.>\'$/) = c;
+str unquote(/^\'<c:.+>\'$/) = c;
 default str unquote(str s) = s;
 
 str readOf(Read r) = "<r>" in {"λ", "ε"} ? "" : unquote("<r>");
@@ -118,3 +119,10 @@ map[str, Pda] pdas(start[Program] p) = ( "<d.name>" : buildPda(d) | d <- p.top.d
 map[str, Tm] tms(start[Program] p) = ( "<d.name>" : buildTm(d) | d <- p.top.decls, d is tm );
 
 set[str] statesOf(Tm m) = m.code<0> + m.edges<from> + m.edges<to> + {m.initial};
+
+Grammar buildGrammar(Decl d) {
+  Rules rules = [ <"<r.lhs>", a is none ? [] : [ unquote("<t>") | t <- a.toks ]> | Rule r <- d.rules, Alt a <- r.alts ];
+  return cfg(rules == [] ? "" : rules[0].lhs, rules);
+}
+
+map[str, Grammar] grammars(start[Program] p) = ( "<d.name>" : buildGrammar(d) | d <- p.top.decls, d is grammar );
