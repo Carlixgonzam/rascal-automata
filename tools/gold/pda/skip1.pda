@@ -1,0 +1,8 @@
+A B C
+abc
+x
+A
+C
+A A a push x
+A B b skip x
+B C c pop x

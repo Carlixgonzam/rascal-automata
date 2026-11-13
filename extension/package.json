@@ -1,22 +1,50 @@
 {
   "name": "automata",
   "displayName": "Automata",
-  "description": "A language for finite automata and regular expressions, with a live view of each automaton.",
+  "description": "Finite automata, regular expressions, pushdown automata and Turing machines, checked as you type and run step by step.",
   "version": "0.1.0",
-  "publisher": "automata",
+  "publisher": "carlixgonzam",
   "license": "BSD-2-Clause",
+  "icon": "assets/icon.png",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/Carlixgonzam/rascal-automata.git"
+  },
+  "homepage": "https://github.com/Carlixgonzam/rascal-automata#readme",
+  "bugs": {
+    "url": "https://github.com/Carlixgonzam/rascal-automata/issues"
+  },
+  "keywords": [
+    "automata",
+    "dfa",
+    "nfa",
+    "regular expressions",
+    "pushdown automata",
+    "turing machine",
+    "rascal",
+    "gold"
+  ],
   "engines": {
     "vscode": "^1.90.0"
   },
-  "categories": ["Programming Languages", "Education"],
-  "activationEvents": ["onLanguage:automata"],
+  "categories": [
+    "Programming Languages",
+    "Education"
+  ],
+  "activationEvents": [
+    "onLanguage:automata"
+  ],
   "main": "./dist/extension.js",
   "contributes": {
     "languages": [
       {
         "id": "automata",
-        "aliases": ["Automata"],
-        "extensions": [".auto"],
+        "aliases": [
+          "Automata"
+        ],
+        "extensions": [
+          ".auto"
+        ],
         "configuration": "./assets/language-configuration.json"
       }
     ],
@@ -33,7 +61,8 @@
     "compile": "webpack --mode development",
     "watch": "webpack --mode development --watch",
     "package": "npm run jar && webpack --mode production --devtool hidden-source-map",
-    "vsix": "npm run package && vsce package --no-dependencies"
+    "vsix": "npm run package && vsce package --no-dependencies",
+    "test": "node test/run.js"
   },
   "dependencies": {
     "@usethesource/rascal-vscode-dsl-lsp-server": "0.13.5"
@@ -41,6 +70,7 @@
   "devDependencies": {
     "@types/node": "^20.0.0",
     "@types/vscode": "^1.90.0",
+    "@vscode/test-electron": "^3.1.0",
     "@vscode/vsce": "^3.0.0",
     "copy-webpack-plugin": "^12.0.0",
     "ts-loader": "^9.5.0",

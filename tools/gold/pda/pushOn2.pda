@@ -1,0 +1,9 @@
+A B C D
+abcd
+xy
+A
+D
+A A a push x
+A B b pushOn x y
+B C c pop y
+C D d pop x

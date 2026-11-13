@@ -1,0 +1,15 @@
+E F
+pqrsNAOI()
+P
+E
+F
+E F p ignore
+E F q ignore
+E F r ignore
+E F s ignore
+E E N ignore
+E E ( push P
+F E A ignore
+F E O ignore
+F E I ignore
+F F ) pop P

@@ -5,3 +5,4 @@ target/
 *.vsix
 extension/assets/jars/
 .DS_Store
+.vscode-test/
