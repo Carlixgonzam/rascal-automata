@@ -3,7 +3,9 @@ module lang::automata::Tests
 import lang::automata::Build;
 import lang::automata::Check;
 import lang::automata::Core;
+import lang::automata::Stack;
 import lang::automata::Syntax;
+import lang::automata::Turing;
 import lang::automata::View;
 import Message;
 import ParseTree;
@@ -266,3 +268,86 @@ test bool traceInsideALabel() {
 }
 
 test bool traceOfEmptyWord() = stepsOf("Has01", "")[0]["notes"] == ["start in Just1", "no active state is final, so the word is rejected"];
+
+Pda pdaOf(str text, str name) = pdas(load(text, |memory:///p.auto|))[name];
+
+test bool lambdaPushLoop() {
+  Pda m = pdaOf("pda L
+                '  start A
+                '  final B
+                '  A -λ, push(x)-\> A
+                '  A -a, ignore-\> B
+                '  B -λ, pop(x)-\> B
+                '", "L");
+  return search(m, "a").accepted && !search(m, "").accepted && !search(m, "aa").accepted;
+}
+
+test bool pushOnFollowsTheCourse() {
+  Pda m = pdaOf("pda P
+                '  start A
+                '  final C
+                '  A -a, push($)-\> A
+                '  A -b, pushOn(1, $)-\> B
+                '  B -c, pop(1)-\> C
+                '  C -d, pop($)-\> C
+                '", "P");
+  return search(m, "abcd").accepted && !search(m, "abc").accepted;
+}
+
+test bool pdaTrace() {
+  Pda m = pdaOf("pda AnBn
+                '  start A
+                '  final B
+                '  A -a, push(a)-\> A
+                '  A -λ, ignore-\> B
+                '  B -b, pop(a)-\> B
+                '", "AnBn");
+  if (list[map[str, value]] s := runOf(m, "ab")["steps"]) {
+    return [ x["stack"] | x <- s ] == [[], ["a"], ["a"], []]
+        && [ x["head"] | x <- s ] == [0, 1, 1, 2]
+        && s[1]["notes"] == ["A -a, push(a)-\> A; the stack is now a"]
+        && s[3]["notes"] == ["B -b, pop(a)-\> B; the stack is now empty", "B is final, the word is read and the stack is empty, so the word is accepted"];
+  }
+  return false;
+}
+
+map[str, Tm] tmsOf(str text) = tms(load(text, |memory:///t.auto|));
+
+test bool turingTrace() {
+  map[str, Tm] ms = tmsOf("tm W
+                          '  start 0
+                          '  0: RW[x]
+                          '");
+  Run r = simulate(ms, "W", "ab");
+  return tapeText(r) == "#xb" && r.head == 1
+      && [ s.note | s <- r.snaps ] == ["start in 0 with the head on cell 0", "0: R", "0: W[x]", "reads x; no transition of 0 applies, so W stops"]
+      && [ s.tape | s <- r.snaps ][2] == ["#", "x", "b", "#"];
+}
+
+test bool turingFallsOffTheLeft() = verdict(simulate(tmsOf("tm L\n  start 0\n  0: L\n"), "L", "a")) == "error: the head fell off the left end of the tape";
+
+test bool turingTwoEdges() {
+  map[str, Tm] ms = tmsOf("tm T
+                          '  start 0
+                          '  0: R
+                          '  1: W[p]
+                          '  2: W[q]
+                          '  0 -a-\> 1
+                          '  0 -!b-\> 2
+                          '");
+  return verdict(simulate(ms, "T", "a")) == "error: two transitions of 0 apply reading a: a and !b";
+}
+
+test bool turingVariableWithoutValue() = verdict(simulate(tmsOf("tm V\n  start 0\n  0: W[$s]\n"), "V", "a")) == "error: $s has no value yet";
+
+test bool turingCall() {
+  map[str, Tm] ms = tmsOf("tm RA
+                          '  start 0
+                          '  0: R[a]
+                          'tm Caller
+                          '  start 0
+                          '  0: C[RA]W[z]
+                          '");
+  Run r = simulate(ms, "Caller", "ba");
+  return tapeText(r) == "#bz" && r.head == 2;
+}

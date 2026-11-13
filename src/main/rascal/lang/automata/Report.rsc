@@ -1,6 +1,10 @@
 module lang::automata::Report
 
+import lang::automata::Build;
 import lang::automata::Core;
+import lang::automata::Stack;
+import lang::automata::Syntax;
+import lang::automata::Turing;
 import List;
 import Set;
 import util::Maybe;
@@ -29,3 +33,40 @@ str note(Automaton a, str q) = q in a.notes ? "   <a.notes[q]>" : "";
 list[str] table(Automaton a)
   = [ "<marks(a, q)> <q><note(a, q)>" | q <- sort(a.states) ]
   + [ "<p> -<l == "" ? "λ" : l>-\> <q>" | <p, l, q> <- sort(a.delta) ];
+
+str describe(Pda m) = "PDA, <size(m.states)> states";
+
+str describe(Tm m) = "TM, <size(statesOf(m))> nodes";
+
+list[str] table(Pda m)
+  = [ "<q == m.initial ? "→" : " "><q in m.final ? "*" : " "> <q>" | q <- sort(m.states) ]
+  + [ "<p> -<op>-\> <q>" | <p, _, _, _, q, op> <- sort(m.delta) ];
+
+list[str] table(Tm m)
+  = [ "<q == m.initial ? "→" : " "> <q>: <intercalate("", [ x.text | x <- m.code[q] ? [] ])>" | q <- sort(statesOf(m)) ]
+  + [ t == "" ? "<p> -\> <q>" : "<p> -<t>-\> <q>" | <p, _, q, t> <- sort(m.edges) ];
+
+str outcomeOf(start[Program] p, Expr e, str w) {
+  str x = "<e>";
+  map[str, Pda] ps = pdas(p);
+  if (x in ps) {
+    return search(ps[x], w).accepted ? "accepted" : "rejected";
+  }
+  map[str, Tm] ts = tms(p);
+  if (x in ts) {
+    return verdict(simulate(ts, x, w));
+  }
+  return verdict(eval(e, env(p)), w);
+}
+
+list[str] showOf(start[Program] p, Expr e) {
+  str x = "<e>";
+  if (x in pdas(p)) {
+    return [describe(pdas(p)[x])] + table(pdas(p)[x]);
+  }
+  if (x in tms(p)) {
+    return [describe(tms(p)[x])] + table(tms(p)[x]);
+  }
+  Automaton a = eval(e, env(p));
+  return [describe(a)] + table(a);
+}

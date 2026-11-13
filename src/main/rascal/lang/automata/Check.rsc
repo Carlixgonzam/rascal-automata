@@ -2,7 +2,9 @@ module lang::automata::Check
 
 import lang::automata::Build;
 import lang::automata::Core;
+import lang::automata::Stack;
 import lang::automata::Syntax;
+import lang::automata::Turing;
 import List;
 import Message;
 import ParseTree;
@@ -103,23 +105,101 @@ set[Message] checkExpr(e:(Expr) `<Op op>(<{Expr ","}+ args>)`, set[str] defined,
   return msgs;
 }
 
-set[Message] checkWords(Decl d, Env defs) {
+set[Message] checkWords(Decl d, set[str] sigma)
+  = sigma == {} ? {} : { error("the symbol <c> of this word is not in the alphabet <braces(sigma)>", w.src)
+                       | w <- d.words, c <- chars(wordOf(w)), c notin sigma };
+
+set[str] alphabetFor(Decl d, start[Program] p, Env defs) {
+  str x = "<d.subject>";
+  map[str, Pda] ps = pdas(p);
+  if (x in ps) {
+    return ps[x].alphabet;
+  }
+  if (x in tms(p)) {
+    return {};
+  }
   try {
-    set[str] sigma = eval(d.subject, defs).alphabet;
-    return { error("the symbol <c> of this word is not in the alphabet <braces(sigma)>", w.src)
-           | w <- d.words, c <- chars(wordOf(w)), c notin sigma };
+    return eval(d.subject, defs).alphabet;
   } catch _: {
     return {};
   }
 }
 
-bool isDef(Decl d) = d is machine || d is regex || d is let;
+bool isDef(Decl d) = d is machine || d is regex || d is let || d is pda || d is tm;
+
+str kindOf(Decl d) = d is pda ? "a pushdown automaton" : "a Turing machine";
+
+list[str] firstNames(Tree t) = [ "<n>" | /Name n := t ];
+
+set[Message] checkPda(Decl d) {
+  Pda m = buildPda(d);
+  list[Name] starts = [ q | (PItem) `start <Name q>` <- d.moves ];
+  set[Message] msgs = {};
+  if (starts == []) {
+    list[str] used = [ "<p>" | (PItem) `<Name p> -<Read _>, <Stack _>-\> <Name _>` <- d.moves ] + firstNames(d.moves);
+    msgs += error("<d.name> has no start state; add a line such as: start <used == [] ? "q0" : used[0]>", d.name.src);
+  }
+  msgs += { error("<d.name> already has a start state", q.src) | q <- starts[1..] };
+  if (m.final == {}) {
+    msgs += warning("<d.name> has no final states, so it accepts no word", d.name.src);
+  }
+  if (starts != []) {
+    rel[str, str] edges = m.delta<from, to>;
+    set[str] seen = {m.initial} + (edges+)[m.initial];
+    msgs += { warning("the state <q> cannot be reached from the start", q.src) | /Name q := d.moves, "<q>" notin seen };
+  }
+  return msgs;
+}
+
+bool overlap(Guard g, Guard h) {
+  if (always() := g || always() := h) {
+    return true;
+  }
+  if (inSet(a, bool x, _) := g, inSet(b, bool y, _) := h) {
+    return x && y || (!x && !y && a & b != {}) || (!x && y && a - b != {}) || (x && !y && b - a != {});
+  }
+  return false;
+}
+
+set[Message] checkTm(Decl d, set[str] machines) {
+  Tm m = buildTm(d);
+  list[Name] starts = [ q | (TItem) `start <Name q>` <- d.parts ];
+  list[Name] nodes = [ x | (TItem) `<Name x>: <Code _>` <- d.parts ];
+  set[str] known = { "<x>" | x <- nodes };
+  set[Message] msgs = {};
+  if (starts == []) {
+    msgs += error("<d.name> has no start node; add a line such as: start <nodes == [] ? "0" : "<nodes[0]>">", d.name.src);
+  }
+  msgs += { error("<d.name> already has a start node", q.src) | q <- starts[1..] };
+  msgs += { error("the node <x> is defined twice", x.src) | i <- [1..size(nodes)], x := nodes[i], "<x>" in { "<y>" | y <- nodes[..i] } };
+  msgs += { error("<q> has no instructions; add a line such as: <q>: R", q.src)
+          | TItem t <- d.parts, !(t is does), /Name q := t, "<q>" notin known };
+  msgs += { error("<c.machine> is not a Turing machine of this file", c.src) | /Instr c := d.parts, c is call, "<c.machine>" notin machines };
+  list[tuple[str, Guard, str, str]] es = sort(m.edges);
+  for (i <- index(es), j <- index(es), i < j, <p, g, q, t> := es[i], <p, h, r, u> := es[j], overlap(g, h)) {
+    msgs += warning("<p> -<t>-\> <q> and <p> -<u>-\> <r> can both apply; the machine stops with an error if that happens", d.name.src);
+  }
+  return msgs;
+}
+
+set[Message] misuse(start[Program] p, map[str, str] kinds) {
+  set[Message] msgs = {};
+  for (/(Expr) `<Op op>(<{Expr ","}+ args>)` := p, (Expr) `<Name x>` <- args, "<x>" in kinds) {
+    msgs += error("<op> works on finite automata, and <x> is <kinds["<x>"]>", x.src);
+  }
+  for (Decl d <- p.top.decls, d is check, Expr e <- [d.subject, d.expected], (Expr) `<Name x>` := e, "<x>" in kinds) {
+    msgs += error("check compares finite automata and regular expressions, and <x> is <kinds["<x>"]>", x.src);
+  }
+  return msgs;
+}
 
 set[Message] check(start[Program] p) {
   list[Decl] decls = [ d | d <- p.top.decls ];
   set[str] names = { "<d.name>" | d <- decls, isDef(d) };
   set[str] defined = {};
-  set[Message] msgs = {};
+  map[str, str] kinds = ( "<d.name>" : kindOf(d) | d <- decls, d is pda || d is tm );
+  set[str] machines = { "<d.name>" | d <- decls, d is tm };
+  set[Message] msgs = misuse(p, kinds);
   Env defs = env(p);
   for (Decl d <- decls) {
     set[str] later = names - defined;
@@ -132,6 +212,10 @@ set[Message] check(start[Program] p) {
         msgs += checkMachine(d);
       } else if (d is regex) {
         msgs += checkRegex(d);
+      } else if (d is pda) {
+        msgs += checkPda(d);
+      } else if (d is tm) {
+        msgs += checkTm(d, machines);
       } else {
         msgs += checkExpr(d.expr, defined, later - {x});
       }
@@ -142,7 +226,7 @@ set[Message] check(start[Program] p) {
       set[Message] found = checkExpr(d.subject, defined, later);
       msgs += found;
       if (d is run && found == {}) {
-        msgs += checkWords(d, defs);
+        msgs += checkWords(d, alphabetFor(d, p, defs));
       }
     }
   }

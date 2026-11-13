@@ -15,6 +15,8 @@ data Re = sym(str c) | eps() | zero() | cat(Re l, Re r) | alt(Re l, Re r) | star
 
 str dead = "∅";
 
+str edgeId(str p, str q) = "<p>→<q>";
+
 list[str] chars(str w) = [ w[i] | i <- [0..size(w)] ];
 
 set[str] closure(Automaton a, set[str] qs) {

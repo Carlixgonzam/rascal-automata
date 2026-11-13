@@ -7,7 +7,7 @@ import ParseTree;
 import Set;
 import util::LanguageServer;
 
-list[loc] files = [|cwd:///examples/course.auto|, |cwd:///examples/errors.auto|];
+list[loc] files = [|cwd:///examples/course.auto|, |cwd:///examples/errors.auto|, |cwd:///examples/pda.auto|, |cwd:///examples/turing.auto|];
 
 Tree parseWith(set[LanguageService] services, loc file) {
   for (parsing(Tree (str, loc) f) <- services) {

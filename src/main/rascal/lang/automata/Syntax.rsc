@@ -9,6 +9,8 @@ syntax Decl
   | run: "run" Expr subject {Word ","}+ words
   | show: "show" Expr subject
   | check: "check" Expr subject "=" Expr expected
+  | pda: "pda" Name name PItem* moves
+  | tm: "tm" Name name TItem* parts
   ;
 
 syntax Kind
@@ -23,6 +25,57 @@ syntax Item
   | final: "final" {Name ","}+ states
   | edge: Name from "-" {Label ","}+ labels "-\>" {Name ","}+ to
   | jump: Name from "-\>" {Name ","}+ to
+  ;
+
+syntax PItem
+  = initial: "start" Name state
+  | final: "final" {Name ","}+ states
+  | move: Name from "-" Read read "," Stack op "-\>" Name to
+  ;
+
+lexical Read = Sym | Eps;
+
+syntax Stack
+  = push: "push" "(" Sym e ")"
+  | pop: "pop" "(" Sym e ")"
+  | ignore: "ignore"
+  | skip: "skip" "(" Sym e ")"
+  | changeTop: "changeTop" "(" Sym e "," Sym f ")"
+  | pushOn: "pushOn" "(" Sym e "," Sym f ")"
+  ;
+
+syntax TItem
+  = initial: "start" Name state
+  | does: Name name ":" Code code
+  | edge: Name from "-" Cond cond "-\>" Name to
+  | jump: Name from "-\>" Name to
+  ;
+
+syntax Cond
+  = among: Not? not {Cell ","}+ cells
+  | bind: Var var "in" Not? not "{" {Cell ","}+ cells "}"
+  ;
+
+lexical Not = "!";
+
+lexical Code = {Instr Gap}+;
+
+lexical Instr
+  = right: "R"
+  | left: "L"
+  | rightTo: "R[" Not? not Cell cell "]"
+  | leftTo: "L[" Not? not Cell cell "]"
+  | write: "W[" Cell cell "]"
+  | call: "C[" Name machine "]"
+  ;
+
+lexical Cell = Sym | Var;
+
+lexical Var = "$" [a-z];
+
+lexical Sym
+  = [A-Za-z0-9$#+*/=.;]
+  | "\'" ![\'\n] "\'"
   ;
 
 syntax Expr
@@ -70,14 +123,14 @@ lexical Lambda = Eps | "lambda";
 lexical Eps = "λ" | "ε";
 
 lexical Word
-  = "\"" [A-Za-z0-9]* "\""
+  = "\"" ![\"\n]* "\""
   | Eps
   ;
 
 keyword Keywords
   = "dfa" | "nfa" | "regex" | "over" | "start" | "final" | "run" | "show" | "check"
   | "determinize" | "minimize" | "complement" | "union" | "intersection" | "difference"
-  | "rename" | "lambda"
+  | "rename" | "lambda" | "pda" | "tm" | "in" | "push" | "pop" | "ignore" | "skip" | "changeTop" | "pushOn"
   ;
 
 layout Layout = Space* !>> [\ \t\n\r] !>> "//";

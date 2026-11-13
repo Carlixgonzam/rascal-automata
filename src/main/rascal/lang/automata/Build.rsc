@@ -1,7 +1,9 @@
 module lang::automata::Build
 
 import lang::automata::Core;
+import lang::automata::Stack;
 import lang::automata::Syntax;
+import lang::automata::Turing;
 import ParseTree;
 
 str labelOf(Label l) = "<l>" in {"λ", "ε", "lambda"} ? "" : "<l>";
@@ -70,3 +72,49 @@ Env env(start[Program] p) {
 start[Program] load(loc file) = parse(#start[Program], file);
 
 start[Program] load(str text, loc origin) = parse(#start[Program], text, origin);
+
+str unquote(/^\'<c:.>\'$/) = c;
+default str unquote(str s) = s;
+
+str readOf(Read r) = "<r>" in {"λ", "ε"} ? "" : unquote("<r>");
+
+str sym(Sym s) = unquote("<s>");
+
+tuple[str top, list[str] put] effect((Stack) `push(<Sym e>)`) = <"", [sym(e)]>;
+tuple[str top, list[str] put] effect((Stack) `pop(<Sym e>)`) = <sym(e), []>;
+tuple[str top, list[str] put] effect((Stack) `ignore`) = <"", []>;
+tuple[str top, list[str] put] effect((Stack) `skip(<Sym e>)`) = <sym(e), [sym(e)]>;
+tuple[str top, list[str] put] effect((Stack) `changeTop(<Sym e>, <Sym f>)`) = <sym(e), [sym(f)]>;
+tuple[str top, list[str] put] effect((Stack) `pushOn(<Sym e>, <Sym f>)`) = <sym(f), [sym(e), sym(f)]>;
+
+Pda buildPda(Decl d) {
+  Moves delta = { <"<p>", readOf(r), effect(s).top, effect(s).put, "<q>", "<r>, <s>">
+                | (PItem) `<Name p> -<Read r>, <Stack s>-\> <Name q>` <- d.moves };
+  list[str] starts = [ "<q>" | (PItem) `start <Name q>` <- d.moves ];
+  set[str] final = { "<q>" | (PItem) `final <{Name ","}+ qs>` <- d.moves, q <- qs };
+  return pushdown({ r | <_, r, _, _, _, _> <- delta, r != "" }, toSet(starts) + final + delta<from> + delta<to>,
+                  starts == [] ? "" : starts[0], final, delta);
+}
+
+Move instr(/^R$/) = moveRight("", false);
+Move instr(/^L$/) = moveLeft("", false);
+Move instr(/^R\[<n:!?><x:.+>\]$/) = moveRight(unquote(x), n == "!");
+Move instr(/^L\[<n:!?><x:.+>\]$/) = moveLeft(unquote(x), n == "!");
+Move instr(/^W\[<x:.+>\]$/) = writes(unquote(x));
+Move instr(/^C\[<x:.+>\]$/) = calls(x);
+
+Guard guardOf(Cond c) = inSet({ unquote("<x>") | x <- c.cells }, "<c.not>" == "!", c is bind ? "<c.var>" : "");
+
+Tm buildTm(Decl d) {
+  map[str, list[Move]] code = ( "<x>" : [ instr("<i>")[text = "<i>"] | /Instr i := c ] | (TItem) `<Name x>: <Code c>` <- d.parts );
+  Edges edges = { <"<p>", guardOf(k), "<q>", "<k>"> | (TItem) `<Name p> -<Cond k>-\> <Name q>` <- d.parts }
+              + { <"<p>", always(), "<q>", ""> | (TItem) `<Name p> -\> <Name q>` <- d.parts };
+  list[str] starts = [ "<q>" | (TItem) `start <Name q>` <- d.parts ];
+  return turing(starts == [] ? "" : starts[0], code, edges);
+}
+
+map[str, Pda] pdas(start[Program] p) = ( "<d.name>" : buildPda(d) | d <- p.top.decls, d is pda );
+
+map[str, Tm] tms(start[Program] p) = ( "<d.name>" : buildTm(d) | d <- p.top.decls, d is tm );
+
+set[str] statesOf(Tm m) = m.code<0> + m.edges<from> + m.edges<to> + {m.initial};

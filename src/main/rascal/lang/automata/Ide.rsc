@@ -1,5 +1,6 @@
 module lang::automata::Ide
 
+import Content;
 import IO;
 import lang::automata::Build;
 import lang::automata::Check;
@@ -49,9 +50,9 @@ lrel[loc, Command] buttons(start[Program] p) {
     if (isDef(d)) {
       out += [<d.src, showName(p, "<d.name>", "", title = "Show")>];
     } else if (d is run) {
-      out += [<d.src, showExpr(p, d.subject, wordOf([ w | w <- d.words ][0]), title = "Show")>];
+      out += [<d.src, showIt(p, d.subject, wordOf([ w | w <- d.words ][0]))>];
     } else if (d is show) {
-      out += [<d.src, showExpr(p, d.subject, "", title = "Show")>];
+      out += [<d.src, showIt(p, d.subject, "")>];
     } else if (just(str w) := counterexample(eval(d.subject, defs), eval(d.expected, defs))) {
       out += [<d.src, showExpr(p, d.subject, w, title = "Show counterexample")>];
     }
@@ -69,7 +70,7 @@ list[InlayHint] hints(start[Program] p) {
     if (d is let) {
       out += [hint(d.src, "  <describe(defs["<d.name>"])>", \type(), atEnd = true)];
     } else if (d is run) {
-      out += [ hint(w.src, " <verdict(eval(d.subject, defs), wordOf(w))>", \type(), atEnd = true) | w <- d.words ];
+      out += [ hint(w.src, " <outcomeOf(p, d.subject, wordOf(w))>", \type(), atEnd = true) | w <- d.words ];
     } else if (d is check) {
       str result = compare("<d.subject>", "<d.expected>", eval(d.subject, defs), eval(d.expected, defs));
       out += [hint(d.src, "  <result>", \type(), atEnd = true)];
@@ -78,8 +79,21 @@ list[InlayHint] hints(start[Program] p) {
   return out;
 }
 
+Command showIt(start[Program] p, e:(Expr) `<Name x>`, str word) = showName(p, "<x>", word, title = "Show");
+default Command showIt(start[Program] p, Expr e, str word) = showExpr(p, e, word, title = "Show");
+
+Content viewOf(start[Program] p, str x, str w) {
+  if (x in pdas(p)) {
+    return view(x, pdas(p)[x], word = w);
+  }
+  if (x in tms(p)) {
+    return view(tms(p), x, word = w);
+  }
+  return view(x, env(p)[x], word = w);
+}
+
 value execute(showName(start[Program] p, str name, str word)) {
-  showInteractiveContent(view(name, env(p)[name], word = word));
+  showInteractiveContent(viewOf(p, name, word));
   return ("result": true);
 }
 

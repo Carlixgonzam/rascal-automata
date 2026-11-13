@@ -1,0 +1,121 @@
+tm anbn_simplified
+  start 5
+  0: W[N]
+  1: W[Y]
+  2: W[x]L[#]
+  3: W[x]
+  4: R
+  5: R
+  2 -> 5
+  3 -> 4
+  4 -#-> 0
+  4 -b-> 2
+  4 -a,x-> 4
+  5 -b-> 0
+  5 -#-> 1
+  5 -a-> 3
+  5 -x-> 5
+
+tm anbncn_simplified
+  start 7
+  0: W[N]
+  1: W[Y]
+  2: W[x]
+  3: W[x]
+  4: R
+  5: R
+  6: W[x]L[#]
+  7: R
+  2 -> 4
+  3 -> 5
+  4 -a,#-> 0
+  4 -b,x-> 4
+  4 -c-> 6
+  5 -c,#-> 0
+  5 -b-> 2
+  5 -a,x-> 5
+  6 -> 7
+  7 -b,c-> 0
+  7 -#-> 1
+  7 -a-> 3
+  7 -x-> 7
+
+tm anbn
+  start 0
+  0: R[!x]
+  1: W[Y]
+  2: W[N]
+  3: W[x]
+  4: W[y]L[#]
+  5: R
+  6: R[!y]
+  0 -b,c-> 2
+  0 -a-> 3
+  0 -#,y-> 6
+  3 -> 5
+  4 -> 0
+  5 -x,c,#-> 2
+  5 -b-> 4
+  5 -a,y-> 5
+  6 -#-> 1
+  6 -!#-> 2
+
+tm anbncn
+  start 8
+  0: W[N]
+  1: W[y]
+  2: L[#]R[!x]
+  3: R
+  4: R
+  5: R
+  6: W[x]
+  7: L
+  8: R
+  9: W[Y]
+  10: W[Y]
+  11: W[z]
+  12: W[N]
+  1 -> 5
+  2 -!a,x-> 0
+  2 -a-> 6
+  3 -!#-> 2
+  3 -#-> 7
+  4 -!a,b,y-> 0
+  4 -b-> 1
+  4 -a,y-> 4
+  5 -b,z-> 5
+  5 -c-> 11
+  5 -!b,c,z-> 12
+  6 -> 4
+  7 -x,y,z-> 7
+  7 -#-> 10
+  7 -a,b,c-> 12
+  8 -!#-> 2
+  8 -#-> 9
+  11 -> 3
+
+tm Copy
+  start 2
+  0: R[#]
+  1: W[#]R[#]R[#]W[$s]L[#]L[#]W[$s]
+  2: R
+  1 -> 2
+  2 -#-> 0
+  2 -$s in !{#}-> 1
+
+tm ShiftRight
+  start 0
+  0: R[#]
+  1: L
+  2: W[#]RW[$s]L
+  3: R[#]R[#]
+  0 -> 1
+  1 -$s in !{#}-> 2
+  1 -#-> 3
+  2 -> 1
+
+run anbn_simplified "aabb", "aab"
+run Copy "ab"
+run ShiftRight "ab"
+
+show anbn_simplified

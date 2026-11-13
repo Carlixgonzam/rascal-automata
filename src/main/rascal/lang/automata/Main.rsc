@@ -29,14 +29,15 @@ bool runAll(start[Program] p) {
   for (Decl d <- p.top.decls) {
     if (d is run) {
       for (w <- d.words) {
-        println("run <d.subject> <w>: <verdict(eval(d.subject, defs), wordOf(w))>");
+        println("run <d.subject> <w>: <outcomeOf(p, d.subject, wordOf(w))>");
       }
     } else if (d is check) {
       println("check <d.subject> = <d.expected>: <compare("<d.subject>", "<d.expected>", eval(d.subject, defs), eval(d.expected, defs))>");
       ok = ok && same(eval(d.subject, defs), eval(d.expected, defs));
     } else if (d is show) {
-      println("show <d.subject>: <describe(eval(d.subject, defs))>");
-      for (row <- table(eval(d.subject, defs))) {
+      list[str] rows = showOf(p, d.subject);
+      println("show <d.subject>: <rows[0]>");
+      for (row <- rows[1..]) {
         println("  <row>");
       }
     }

@@ -2,56 +2,57 @@
 <html>
 <head>
 <meta charset="utf-8">
-<script src="https://cdnjs.cloudflare.com/ajax/libs/cytoscape/3.28.1/cytoscape.umd.js"></script>
-<script src="https://cdnjs.cloudflare.com/ajax/libs/dagre/0.8.5/dagre.min.js"></script>
-<script src="https://cdn.jsdelivr.net/npm/cytoscape-dagre@3.0.0/cytoscape-dagre.min.js"></script>
+<script src="/lib/cytoscape.js"></script>
+<script src="/lib/cytoscape-dagre.js"></script>
 <style>
-  body { margin: 0; font: 14px Georgia, serif; color: #111; background: #fff; }
-  header { display: flex; gap: 14px; align-items: baseline; padding: 10px 16px; border-bottom: 1px solid #ddd; }
-  header b { font-weight: normal; font-size: 17px; }
-  input { font: 15px Menlo, monospace; width: 260px; padding: 3px 6px; border: 1px solid #999; }
-  #result.yes { color: #1b5e20; }
-  #result.no { color: #b71c1c; }
-  main { position: absolute; top: 46px; bottom: 0; left: 0; right: 0; display: flex; }
-  #graph { flex: 1; }
-  #steps { width: 320px; margin: 0; padding: 0; list-style: none; overflow: auto; border-left: 1px solid #ddd; font: 12.5px/1.55 Menlo, monospace; }
-  #steps li { padding: 6px 12px 7px 14px; border-bottom: 1px solid #eee; color: #777; cursor: pointer; }
-  #steps li.here { color: #111; border-left: 3px solid #bf360c; padding-left: 11px; background: #fcfcfa; }
-  #steps li span { display: block; color: inherit; font-weight: bold; }
+  body { margin: 0; font: 14px sans-serif; color: #000; background: #fff; display: flex; flex-direction: column; height: 100vh; }
+  header, .row, #say { padding: 8px 12px; }
+  header { display: flex; gap: 6px; align-items: center; }
+  header b { margin-right: 8px; }
+  input { font: 14px monospace; width: 200px; }
+  #result { margin-left: 8px; }
+  .row { display: flex; gap: 2px; align-items: center; min-height: 26px; padding-top: 0; }
+  .row small { width: 44px; color: #666; }
+  .cells { display: flex; gap: 2px; }
+  .cell { font: 15px monospace; min-width: 24px; height: 24px; line-height: 24px; text-align: center; border: 1px solid #aaa; }
+  .read { color: #aaa; }
+  .here { border: 2px solid #000; }
+  #say { font: 13px monospace; color: #333; white-space: pre-line; max-height: 30vh; overflow: auto; border-bottom: 1px solid #ddd; }
+  #graph { flex: 1; min-height: 0; }
 </style>
 </head>
 <body>
 <header>
   <b id="name"></b>
   <input id="word" placeholder="word" autocomplete="off" spellcheck="false">
+  <button id="run">Run</button>
+  <button id="back">◀</button>
+  <button id="next">▶</button>
   <span id="result"></span>
 </header>
-<main>
-  <div id="graph"></div>
-  <ol id="steps"></ol>
-</main>
+<div class="row"><small>tape</small><span id="tape" class="cells"></span></div>
+<div class="row" id="stackRow" hidden><small>stack</small><span id="stack" class="cells"></span></div>
+<div id="say"></div>
+<div id="graph"></div>
 <script>
 const $ = id => document.getElementById(id);
-const word = $("word");
 let cy;
-let run = { steps: [], accepted: false };
+let run = { word: "", steps: [], verdict: "", at: 0 };
 
 const style = [
   { selector: "node", style: {
       label: "data(label)", "text-wrap": "wrap", "text-valign": "center", "text-halign": "center",
-      "background-color": "#fff", "border-width": 1.5, "border-color": "#111", shape: "ellipse",
-      width: "label", height: "label", padding: "13px", "font-family": "Menlo, monospace", "font-size": "13px" } },
+      "background-color": "#fff", "border-width": 1.5, "border-color": "#000", shape: "ellipse",
+      width: "label", height: "label", padding: "12px", "font-family": "monospace", "font-size": "13px" } },
   { selector: "node.final", style: { "border-style": "double", "border-width": 6 } },
   { selector: "node.entry", style: { width: 1, height: 1, padding: 0, "border-width": 0, "background-opacity": 0, label: "" } },
-  { selector: "node.on", style: { "background-color": "#fff3c4" } },
-  { selector: "node.on.yes", style: { "background-color": "#c8e6c9" } },
-  { selector: "node.on.no", style: { "background-color": "#ffcdd2" } },
+  { selector: "node.on", style: { "background-color": "#ffe9a8" } },
   { selector: "edge", style: {
-      label: "data(label)", "curve-style": "bezier", "target-arrow-shape": "triangle", width: 1,
-      "line-color": "#555", "target-arrow-color": "#555", "font-family": "Menlo, monospace", "font-size": "12px",
+      label: "data(label)", "text-wrap": "wrap", "curve-style": "bezier", "target-arrow-shape": "triangle", width: 1,
+      "line-color": "#444", "target-arrow-color": "#444", "font-family": "monospace", "font-size": "12px",
       "text-background-color": "#fff", "text-background-opacity": 1, "loop-direction": "-90deg", "loop-sweep": "-50deg" } },
-  { selector: "edge.took", style: { width: 2.5, "line-color": "#bf360c", "target-arrow-color": "#bf360c", color: "#bf360c" } },
-  { selector: "edge.jump", style: { width: 2, "line-style": "dashed", "line-color": "#bf360c", "target-arrow-color": "#bf360c" } }
+  { selector: "edge.took", style: { width: 3 } },
+  { selector: "edge.jump", style: { width: 2, "line-style": "dashed" } }
 ];
 
 function draw(a) {
@@ -65,51 +66,57 @@ function draw(a) {
   }
   for (const e of a.edges) elements.push({ data: e });
   cy = cytoscape({ container: $("graph"), elements, style, layout: { name: "dagre", rankDir: "LR", nodeSep: 50, rankSep: 80 } });
-  window.onresize = () => cy.fit(undefined, 30);
 }
 
-function list() {
-  $("steps").replaceChildren(...run.steps.map((s, i) => {
-    const li = document.createElement("li");
-    const head = document.createElement("span");
-    head.textContent = i == 0 ? "0  start" : i + "  read " + s.read;
-    li.append(head, ...s.notes.map(n => { const d = document.createElement("div"); d.textContent = n; return d; }));
-    li.onclick = () => { word.focus(); word.setSelectionRange(i, i); show(); };
-    return li;
-  }));
+function cell(text, cls) {
+  const span = document.createElement("span");
+  span.textContent = text;
+  span.className = cls;
+  return span;
 }
 
 function show() {
-  if (run.steps.length == 0) return;
-  const at = Math.min(word.selectionStart, run.steps.length - 1);
-  const s = run.steps[at];
-  const tone = at == run.steps.length - 1 ? (run.accepted ? " yes" : " no") : "";
-  cy.elements().removeClass("on yes no took jump");
-  for (const q of s.states) cy.getElementById(q).addClass("on" + tone);
+  const s = run.steps[run.at];
+  cy.elements().removeClass("on took jump");
+  for (const q of s.states) cy.getElementById(q).addClass("on");
   for (const e of s.moves) cy.getElementById(e).addClass("took");
   for (const e of s.jumps) cy.getElementById(e).addClass("jump");
-  [...$("steps").children].forEach((li, i) => li.classList.toggle("here", i == at));
-  $("steps").children[at].scrollIntoView({ block: "nearest" });
+  const tape = s.tape.length == 0 && s.read ? ["λ"] : s.tape;
+  $("tape").replaceChildren(...tape.map((c, i) =>
+    cell(c, "cell" + (s.read && i < s.head ? " read" : "") + (i == s.head || (s.read && s.tape.length == 0) ? " here" : ""))));
+  $("stackRow").hidden = !s.stack;
+  if (s.stack) $("stack").replaceChildren(...(s.stack.length ? s.stack : ["empty"]).map(c => cell(c, "cell")));
+  $("say").textContent = "step " + run.at + " of " + (run.steps.length - 1) + "\n" + s.notes.join("\n");
+  $("result").textContent = run.at == run.steps.length - 1 ? run.verdict : "";
 }
 
-async function update() {
-  const r = await (await fetch("/run?word=" + encodeURIComponent(word.value))).json();
-  $("result").className = r.error ? "no" : r.accepted ? "yes" : "no";
-  $("result").textContent = r.error || (r.accepted ? "accepted" : "rejected");
-  run = r.error ? { steps: [], accepted: false } : r;
-  if (r.error) cy.elements().removeClass("on yes no took jump");
-  list();
+async function start(toEnd) {
+  const word = $("word").value.trim();
+  const r = await (await fetch("/run?word=" + encodeURIComponent(word))).json();
+  if (r.error) {
+    $("result").textContent = r.error;
+    return;
+  }
+  run = { word, steps: r.steps, verdict: r.verdict, at: toEnd ? r.steps.length - 1 : 0 };
   show();
 }
 
-word.addEventListener("input", update);
-for (const e of ["keyup", "click", "select"]) word.addEventListener(e, show);
+function move(d) {
+  if (run.steps.length == 0 || run.word != $("word").value.trim()) return start(false);
+  run.at = Math.min(Math.max(run.at + d, 0), run.steps.length - 1);
+  show();
+}
+
+$("run").onclick = () => start(true);
+$("back").onclick = () => move(-1);
+$("next").onclick = () => move(1);
+$("word").onkeydown = e => { if (e.key == "Enter") start(true); };
 
 fetch("/automaton").then(r => r.json()).then(a => {
   $("name").textContent = a.name;
-  word.value = a.word;
+  $("word").value = a.word;
   draw(a);
-  update();
+  start(false);
 });
 </script>
 </body>

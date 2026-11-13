@@ -1,0 +1,59 @@
+pda anbn
+  start A
+  final B
+  A -a, push(a)-> A
+  A -λ, ignore-> B
+  B -b, pop(a)-> B
+
+pda wff
+  start E
+  final F
+  E -p, ignore-> F
+  E -q, ignore-> F
+  E -r, ignore-> F
+  E -s, ignore-> F
+  E -N, ignore-> E
+  E -'(', push(P)-> E
+  F -A, ignore-> E
+  F -O, ignore-> E
+  F -I, ignore-> E
+  F -')', pop(P)-> F
+
+pda subtraction
+  start 1
+  final 4, 5
+  1 -λ, push($)-> 2
+  2 -1, push(1)-> 2
+  2 -'-', skip(1)-> 3
+  3 -1, pop(1)-> 3
+  3 -=, skip($)-> 4
+  3 -=, skip(1)-> 6
+  3 -1, pushOn(1, $)-> 8
+  4 -0, pop($)-> 4
+  6 -λ, pop($)-> 5
+  6 -1, pop(1)-> 6
+  7 -'-', skip(1)-> 6
+  8 -=, skip(1)-> 7
+  8 -1, push(1)-> 8
+
+pda pushOn2
+  start A
+  final D
+  A -a, push(x)-> A
+  A -b, pushOn(y, x)-> B
+  B -c, pop(y)-> C
+  C -d, pop(x)-> D
+
+pda change1
+  start A
+  final C
+  A -a, push(x)-> A
+  A -b, changeTop(x, y)-> B
+  B -c, pop(y)-> C
+
+pda skip1
+  start A
+  final C
+  A -a, push(x)-> A
+  A -b, skip(x)-> B
+  B -c, pop(x)-> C
